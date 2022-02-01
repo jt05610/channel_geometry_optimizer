@@ -8,19 +8,17 @@ from numpy import dot, array
 class Point:
     x: float
     y: float
-    z: float = 0
 
-    def __init__(self, x: float, y: float, z: float = 0):
+    def __init__(self, x: float, y: float):
         self.x = round(x, 5)
         self.y = round(y, 5)
-        self.z = round(z, 5)
 
     def __iter__(self):
         yield self.x
         yield self.y
 
     def __repr__(self):
-        return f"({self.x}, {self.y})"
+        return f'({self.x}, {self.y})'
 
 
 def point_array(point: Point) -> array:
@@ -139,13 +137,13 @@ class DesignInterface(ABC):
         raise NotImplementedError
 
 
-def create_layer(n_points, y_level, z_level, spacing) -> Layer:
+def create_layer(n_points, y_level, spacing) -> Layer:
     leftmost = (n_points - 1) * spacing / 2
 
     def gen() -> Iterable[Point]:
         for i in range(0, n_points):
             x = -leftmost + i * spacing
-            yield Point(x, y_level, z_level)
+            yield Point(x, y_level)
 
     return Layer(tuple(gen()))
 
@@ -210,24 +208,21 @@ class Channel:
     def top_wall(self):
         return Line(self.walls[0].end, self.walls[1].end)
 
+
+    
     def __iter__(self):
         yield from self.walls
         yield self.top_wall
         yield self.bottom_wall
 
-
-def channel_point_gen(channel: Channel):
-    for line in channel:
-        yield from line
-
+    
+    
 
 class ChannelLayer:
     node_layers: Tuple[Layer, ...]
     channels: Tuple[Channel, ...]
 
-    def __init__(
-        self, node_layers: Tuple[Layer, ...], channels: Tuple[Channel, ...]
-    ):
+    def __init__(self, node_layers: Tuple[Layer, ...], channels: Tuple[Channel, ...]):
         self.node_layers = node_layers
         self.channels = channels
 
@@ -237,24 +232,9 @@ class ChannelLayer:
 
 class Lattice:
     channel_layers: Tuple[ChannelLayer, ...]
-    layer_points: tuple
-    point_spacing: float
-    channel_width: float
-    height: float = 0
 
-    def __init__(
-        self,
-        channel_layers: Tuple[ChannelLayer, ...],
-        layer_points: tuple,
-        point_spacing: float,
-        channel_width: float,
-        height: float = 0,
-    ):
+    def __init__(self, channel_layers: Tuple[ChannelLayer, ...]):
         self.channel_layers = channel_layers
-        self.layer_points = layer_points
-        self.point_spacing = point_spacing
-        self.channel_width = channel_width
-        self.height = height
 
     def __iter__(self):
         yield from self.channel_layers
@@ -473,14 +453,12 @@ def create_lattice(
     layer_points: tuple,
     point_spacing: float,
     channel_width: float,
-    height: float = 0,
 ) -> Lattice:
     def layer_gen():
         for i, points in enumerate(layer_points):
             yield create_layer(
                 points,
                 point_spacing * i / 2,
-                height,
                 point_spacing,
             )
 
@@ -510,13 +488,7 @@ def create_lattice(
             channels[i + 1] = flatten_channel_layer(channels[i + 1], "start")
         return tuple(channels)
 
-    return Lattice(
-        channel_layers=cut_channel_gen(),
-        layer_points=layer_points,
-        point_spacing=point_spacing,
-        channel_width=channel_width,
-        height=height,
-    )
+    return Lattice(channel_layers=cut_channel_gen())
 
 
 def random_layer_sequence(n_layers, max_width, max_layer_difference):
@@ -548,136 +520,3 @@ def random_layer_sequence(n_layers, max_width, max_layer_difference):
         return random_layer_sequence(n_layers, max_width, max_layer_difference)
     else:
         return tuple(layers)
-
-
-class ExtrudedChannel:
-    bottom_channel: Channel
-    top_channel: Channel
-
-    def __init__(self, bottom_channel: Channel, top_channel: Channel):
-        self.bottom_channel = bottom_channel
-        self.top_channel = top_channel
-
-    @property
-    def side_edges(self):
-        for top_point, bottom_point in zip(
-            channel_point_gen(self.top_channel),
-            channel_point_gen(self.bottom_channel),
-        ):
-            yield Line(bottom_point, top_point)
-
-    @property
-    def top_face(self):
-        yield tuple(self.top_channel)
-
-    @property
-    def bottom_face(self):
-        yield tuple(self.bottom_channel)
-
-    @property
-    def left_face(self):
-        return (
-            self.bottom_channel.walls[0],
-            Line(
-                self.bottom_channel.walls[0].start,
-                self.top_channel.walls[0].start,
-            ),
-            self.top_channel.walls[0],
-            Line(
-                self.bottom_channel.walls[0].end, self.top_channel.walls[0].end
-            ),
-        )
-
-    @property
-    def right_face(self):
-        return (
-            self.bottom_channel.walls[1],
-            Line(
-                self.bottom_channel.walls[1].start,
-                self.top_channel.walls[1].start,
-            ),
-            self.top_channel.walls[1],
-            Line(
-                self.bottom_channel.walls[1].end, self.top_channel.walls[1].end
-            ),
-        )
-
-    @property
-    def front_face(self):
-        return (
-            self.bottom_channel.bottom_wall,
-            Line(
-                self.bottom_channel.walls[1].start,
-                self.top_channel.walls[1].start,
-            ),
-            self.top_channel.bottom_wall,
-            Line(
-                self.bottom_channel.walls[0].start,
-                self.top_channel.walls[0].start,
-            ),
-        )
-
-    @property
-    def back_face(self):
-        return (
-            self.bottom_channel.top_wall,
-            Line(
-                self.bottom_channel.walls[1].end, self.top_channel.walls[1].end
-            ),
-            self.top_channel.top_wall,
-            Line(
-                self.bottom_channel.walls[0].end, self.top_channel.walls[0].end
-            ),
-        )
-
-    def __iter__(self) -> Iterable[Line]:
-        yield from self.bottom_channel
-        yield from self.side_edges
-        yield from self.top_channel
-
-    def face_iter(self):
-        yield from (
-            self.top_face,
-            self.bottom_face,
-            self.front_face,
-            self.back_face,
-            self.left_face,
-            self.right_face,
-        )
-
-
-def extruded_channel_gen(
-        lattice: Lattice, height: float
-) -> Iterable[ExtrudedChannel]:
-
-    extruded_lattice = create_lattice(
-        lattice.layer_points,
-        lattice.point_spacing,
-        lattice.channel_width,
-        height,
-    )
-    for bottom_channel, top_channel in zip(
-            lattice_channel_gen(lattice), lattice_channel_gen(extruded_lattice)
-    ):
-        yield ExtrudedChannel(bottom_channel, top_channel)
-
-
-def extruded_lattice_edge_gen(
-        lattice: Lattice, height: float
-) -> Iterable[Line]:
-    for extruded_channel in extruded_channel_gen(lattice, height):
-        yield from extruded_channel
-
-
-def extruded_lattice_vertex_gen(lattice: Lattice, height: float):
-    for edge in extruded_lattice_edge_gen(lattice, height):
-        yield from edge
-
-
-def extruded_lattice_vertex_set(lattice: Lattice, height: float):
-    return set(extruded_lattice_vertex_gen(lattice, height))
-
-
-def extruded_lattice_face_gen(lattice: Lattice, height: float):
-    for extruded_channel in extruded_channel_gen(lattice, height):
-        yield from extruded_channel.face_iter()

@@ -1,32 +1,19 @@
 import sys
+import os
 
-sys.path.insert(
-    0, r"C:\Users\taylojon\PycharmProjects\channel_geometry_optimizer"
-)
+sys.path.insert(0, r"C:\Users\taylojon\PycharmProjects\channel_geometry_optimizer")
 
-from salome_interface import SalomeInterface, Point
-from geometry import (
-    create_lattice,
-    lattice_point_set,
-    lattice_line_gen,
-    lattice_channel_gen,
-)
-
+from salome_interface import SalomeInterface
+from geometry import create_lattice
 interface = SalomeInterface()
 
-lattice = create_lattice((2, 1, 2, 3, 2, 1, 2, 3, 2, 1, 1), 5, 0.5)
+lattice = create_lattice(
+    (2, 1, 2, 3, 2, 1, 2, 3, 2, 1, 1), 5, 0.5
+)
 
-for point in lattice_point_set(lattice):
-    interface.add_point(point)
+save_name = r'C:/Users/taylojon/PycharmProjects/channel_geometry_optimizer/full_stack_from_bat.unv'
+interface.create_geometry(lattice, 0.28*2)
+interface.mesh_pipeline(save_name)
 
-for line in lattice_line_gen(lattice):
-    interface.add_line(line)
-
-for channel in lattice_channel_gen(lattice):
-    interface.add_face(channel)
-
-interface.fuse_faces(lattice)
-interface.extrude(0.28 * 2)
-
-if salome.sg.hasDesktop():
-    salome.sg.updateObjBrowser()
+import killSalomeWithPort
+killSalomeWithPort.killMyPort(os.getenv('NSPORT'))
