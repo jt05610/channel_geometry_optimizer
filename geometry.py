@@ -1,33 +1,44 @@
 from abc import ABC, abstractmethod
 from typing import Tuple, Iterable
-from dataclasses import dataclass
 from random import randint
 from math import atan2, pi, cos, sin, sqrt
 from numpy import dot, array
 
 
-@dataclass(frozen=True)
 class Point:
     x: float
     y: float
 
+    def __init__(self, x: float, y: float):
+        self.x = round(x, 5)
+        self.y = round(y, 5)
+
     def __iter__(self):
         yield self.x
         yield self.y
+
+    def __repr__(self):
+        return f'({self.x}, {self.y})'
 
 
 def point_array(point: Point) -> array:
     return array((point.x, point.y))
 
 
-@dataclass(frozen=True)
 class Line:
     start: Point
     end: Point
 
+    def __init__(self, start: Point, end: Point):
+        self.start = start
+        self.end = end
+
     def __iter__(self):
         yield self.start
         yield self.end
+
+    def __eq__(self, other):
+        return other.start == self.start and other.end == self.end
 
 
 def xs(line):
@@ -89,9 +100,11 @@ def intersection(line_1: Line, line_2: Line) -> Point:
     return Point(*((num / denom) * db + b1))
 
 
-@dataclass(frozen=True)
 class Layer:
     points: Tuple[Point, ...]
+
+    def __init__(self, points: Tuple[Point, ...]):
+        self.points = points
 
     def __len__(self):
         return len(self.points)
@@ -103,15 +116,18 @@ class Layer:
         return self.points[item]
 
 
-@dataclass(frozen=True)
 class ConnectedLayers:
     layers: Tuple[Layer, ...]
     lines: Tuple[Line, ...]
 
+    def __init__(self, layers: Tuple[Layer, ...], lines: Tuple[Line, ...]):
+        self.layers = layers
+        self.lines = lines
+
 
 class DesignInterface(ABC):
     @abstractmethod
-    def add_point(self, point: Point, name: str):
+    def add_point(self, point: Point):
         raise NotImplementedError
 
     def add_line(
@@ -176,10 +192,13 @@ def offset_line(line: Line, offset: float, backwards=False) -> Line:
     )
 
 
-@dataclass(frozen=True)
 class Channel:
     walls: Tuple[Line, ...]
     center_line: Line
+
+    def __init__(self, walls: Tuple[Line, ...], center_line: Line):
+        self.walls = walls
+        self.center_line = center_line
 
     @property
     def bottom_wall(self):
@@ -195,18 +214,23 @@ class Channel:
         yield self.bottom_wall
 
 
-@dataclass(frozen=True)
 class ChannelLayer:
     node_layers: Tuple[Layer, ...]
     channels: Tuple[Channel, ...]
+
+    def __init__(self, node_layers: Tuple[Layer, ...], channels: Tuple[Channel, ...]):
+        self.node_layers = node_layers
+        self.channels = channels
 
     def __iter__(self):
         yield from self.channels
 
 
-@dataclass(frozen=True)
 class Lattice:
     channel_layers: Tuple[ChannelLayer, ...]
+
+    def __init__(self, channel_layers: Tuple[ChannelLayer, ...]):
+        self.channel_layers = channel_layers
 
     def __iter__(self):
         yield from self.channel_layers
@@ -280,7 +304,7 @@ def create_channel(line: Line, width: float):
 
 def join_channels(
     channel_1: Channel, channel_2: Channel
-) -> tuple[Channel, ...]:
+) -> Tuple[Channel, ...]:
     common = common_point(channel_1.center_line, channel_2.center_line)
     join_at = tuple(
         start_or_end(c.center_line, common) for c in (channel_1, channel_2)

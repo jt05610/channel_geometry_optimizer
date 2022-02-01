@@ -2,7 +2,6 @@ import unittest
 import geometry
 import matplotlib
 import matplotlib.pyplot as plt
-from dataclasses import FrozenInstanceError
 
 
 class MatplotlibInterface(geometry.DesignInterface):
@@ -11,19 +10,14 @@ class MatplotlibInterface(geometry.DesignInterface):
         self.fig, self.ax = plt.subplots()
         self.ax.set_aspect("equal")
 
-    def add_point(self, x: float, y: float, name: str):
-        self.ax.scatter(x, y, c="blue")
+    def add_point(self, point: geometry.Point):
+        self.ax.scatter(point.x, point.y, c="blue")
 
     def add_line(
         self,
         line: geometry.Line,
-        name: str,
-        construct=False,
     ):
-        if construct:
-            fmt = "g--"
-        else:
-            fmt = "b-"
+        fmt = "b-"
         self.ax.plot(geometry.xs(line), geometry.ys(line), fmt)
 
     @staticmethod
@@ -38,12 +32,6 @@ class DataStructuresTestCase(unittest.TestCase):
     def assert_array_equal(self, expected, array: geometry.array):
         for e, a in zip(expected, array):
             self.assertEqual(e, a)
-
-    # noinspection PyDataclass
-    def test_point_immutable(self):
-        with self.assertRaises(FrozenInstanceError):
-            point = geometry.Point(5, 5)
-            point.x = 6
 
     def test_point_array(self):
         point = geometry.Point(5, 5)
@@ -121,9 +109,9 @@ class DataStructuresTestCase(unittest.TestCase):
     def plot_channels(channels):
         interface = MatplotlibInterface()
         for channel in channels:
-            interface.add_line(channel.center_line, "", construct=True)
+            interface.add_line(channel.center_line)
             for wall in channel.walls:
-                interface.add_line(wall, "")
+                interface.add_line(wall)
         interface.show()
 
     def test_join_channels(self):
@@ -161,5 +149,11 @@ class DataStructuresTestCase(unittest.TestCase):
         )
         print(geometry.lattice_point_set(lattice))
         for line in geometry.lattice_line_gen(lattice):
-            self.interface.add_line(line, name="")
+            self.interface.add_line(line)
         self.interface.show()
+
+    def test_point_set(self):
+        lattice = geometry.create_lattice(
+            (2, 1, 2, 3, 2, 1, 2, 3, 2, 1, 1), 5, 0.5
+        )
+        print(geometry.lattice_point_set(lattice))
