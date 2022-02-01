@@ -1,7 +1,7 @@
 from typing import List
-import salome
+
+import SMESH
 from salome.geom import geomBuilder
-import SMESH, SALOMEDS
 from salome.smesh import smeshBuilder
 
 from geometry import (
@@ -10,7 +10,9 @@ from geometry import (
     Point,
     Channel,
     Lattice,
-    lattice_channel_gen, lattice_point_set, lattice_line_gen,
+    lattice_channel_gen,
+    lattice_point_set,
+    lattice_line_gen,
 )
 
 
@@ -18,11 +20,7 @@ class SalomeVertex:
     obj: object
     point: Point
 
-    def __init__(
-            self,
-            obj: object,
-            point: Point
-    ):
+    def __init__(self, obj: object, point: Point):
         self.obj = obj
         self.point = point
 
@@ -31,11 +29,7 @@ class SalomeLine:
     obj: object
     line: Line
 
-    def __init__(
-            self,
-            obj: object,
-            line: Line
-    ):
+    def __init__(self, obj: object, line: Line):
         self.obj = obj
         self.line = line
 
@@ -44,11 +38,7 @@ class SalomeFace:
     obj: object
     channel: Channel
 
-    def __init__(
-            self,
-            obj: object,
-            channel: Channel
-    ):
+    def __init__(self, obj: object, channel: Channel):
         self.obj = obj
         self.channel = channel
 
@@ -57,11 +47,7 @@ class SalomeFusedFaces:
     obj: object
     lattice: Lattice
 
-    def __init__(
-            self,
-            obj: object,
-            lattice: Lattice
-    ):
+    def __init__(self, obj: object, lattice: Lattice):
         self.obj = obj
         self.lattice = lattice
 
@@ -84,7 +70,6 @@ class SalomeInterface(DesignInterface):
         self.faces: List[SalomeFace] = []
         self.mesh_parameters = None
         self.mesh = None
-        self.gg = salome.ImportComponentGUI("GEOM")
 
     def create_geometry(self, lattice: Lattice, extrusion_height: float):
 
@@ -102,7 +87,9 @@ class SalomeInterface(DesignInterface):
         self.create_groups()
 
     def build_hypothesis(self):
-        self.mesh_parameters = self.mesh_builder.CreateHypothesis('NETGEN_Parameters', 'NETGENEngine')
+        self.mesh_parameters = self.mesh_builder.CreateHypothesis(
+            "NETGEN_Parameters", "NETGENEngine"
+        )
         self.mesh_parameters.SetSecondOrder(0)
         self.mesh_parameters.SetOptimize(1)
         self.mesh_parameters.SetFineness(3)
@@ -117,21 +104,26 @@ class SalomeInterface(DesignInterface):
 
     def create_mesh(self):
         self.mesh = self.mesh_builder.Mesh(self.extrusion)
-        netgen_1d_2d_3d = self.mesh_builder.CreateHypothesis('NETGEN_2D3D', 'NETGENEngine')
+        netgen_1d_2d_3d = self.mesh_builder.CreateHypothesis(
+            "NETGEN_2D3D", "NETGENEngine"
+        )
         self.mesh.AddHypothesis(self.mesh_parameters)
         self.mesh.AddHypothesis(netgen_1d_2d_3d)
-        walls = self.mesh.GroupOnGeom(self.wall_group, 'walls', SMESH.FACE)
-        organic = self.mesh.GroupOnGeom(self.organic_group, 'organic_inlet', SMESH.FACE)
-        aqueous = self.mesh.GroupOnGeom(self.aqueous_group, 'aqueous_inlet', SMESH.FACE)
-        outlet = self.mesh.GroupOnGeom(self.outlet_group, 'outlet', SMESH.FACE)
+        walls = self.mesh.GroupOnGeom(self.wall_group, "walls", SMESH.FACE)
+        organic = self.mesh.GroupOnGeom(
+            self.organic_group, "organic_inlet", SMESH.FACE
+        )
+        aqueous = self.mesh.GroupOnGeom(
+            self.aqueous_group, "aqueous_inlet", SMESH.FACE
+        )
+        outlet = self.mesh.GroupOnGeom(self.outlet_group, "outlet", SMESH.FACE)
 
         self.mesh.Compute()
-
-        self.mesh_builder.SetName(walls, 'walls')
-        self.mesh_builder.SetName(organic, 'organic_inlet')
-        self.mesh_builder.SetName(aqueous, 'aqueous_inlet')
-        self.mesh_builder.SetName(outlet, 'outlet')
-        self.mesh_builder.SetName(self.mesh.GetMesh(), 'outlet')
+        self.mesh_builder.SetName(walls, "walls")
+        self.mesh_builder.SetName(organic, "organic_inlet")
+        self.mesh_builder.SetName(aqueous, "aqueous_inlet")
+        self.mesh_builder.SetName(outlet, "outlet")
+        self.mesh_builder.SetName(self.mesh.GetMesh(), "outlet")
 
     def export_mesh(self, filename):
         self.mesh.ExportUNV(filename)
@@ -165,9 +157,11 @@ class SalomeInterface(DesignInterface):
         self.lattice = lattice
 
     def extrude(self, height: float):
-        self.extrusion = self.builder.MakePrismDXDYDZ(self.fuse.obj, 0, 0, height)
+        self.extrusion = self.builder.MakePrismDXDYDZ(
+            self.fuse.obj, 0, 0, height
+        )
         self.extrusion_height = height
-        self.builder.addToStudy(self.extrusion, 'extrusion')
+        self.builder.addToStudy(self.extrusion, "extrusion")
 
     def vertex_lookup(self, point: Point) -> object:
         return next(filter(lambda x: x.point == point, self.vertices)).obj
@@ -189,66 +183,66 @@ class SalomeInterface(DesignInterface):
         channel = self.lattice.channel_layers[0].channels[0]
         points = tuple(map(self.make_vertex, channel.bottom_wall))
         points += tuple(map(self.vertex_func, channel.bottom_wall))
-        return self.builder.GetFaceByPoints(
-            self.extrusion,
-            *points
-        )
+        return self.builder.GetFaceByPoints(self.extrusion, *points)
 
     @property
     def organic_face(self):
         channel = self.lattice.channel_layers[0].channels[1]
         points = tuple(map(self.make_vertex, channel.bottom_wall))
         points += tuple(map(self.vertex_func, channel.bottom_wall))
-        return self.builder.GetFaceByPoints(
-            self.extrusion,
-            *points
-        )
+        return self.builder.GetFaceByPoints(self.extrusion, *points)
 
     @property
     def outlet_face(self):
         channel = self.lattice.channel_layers[-1].channels[0]
         points = tuple(map(self.make_vertex, channel.top_wall))
         points += tuple(map(self.vertex_func, channel.top_wall))
-        return self.builder.GetFaceByPoints(
-            self.extrusion,
-            *points
-        )
+        return self.builder.GetFaceByPoints(self.extrusion, *points)
 
     def face_id(self, face: object):
         return self.builder.GetSubShapeID(self.extrusion, face)
 
     def create_wall_group(self):
-        self.wall_group = self.builder.CreateGroup(self.extrusion, self.builder.ShapeType["FACE"])
-        sub_faces = self.builder.SubShapeAllSortedCentres(self.extrusion, self.builder.ShapeType["FACE"])
+        self.wall_group = self.builder.CreateGroup(
+            self.extrusion, self.builder.ShapeType["FACE"]
+        )
+        sub_faces = self.builder.SubShapeAllSortedCentres(
+            self.extrusion, self.builder.ShapeType["FACE"]
+        )
         for face in sub_faces:
             self.builder.AddObject(self.wall_group, self.face_id(face))
 
         for face in (self.aqueous_face, self.organic_face, self.outlet_face):
             self.builder.RemoveObject(self.wall_group, self.face_id(face))
 
-        display_group = self.builder.addToStudy(self.wall_group, "walls")
-        self.gg.createAndDisplayGO(display_group)
+        self.builder.addToStudy(self.wall_group, "walls")
 
     def create_aqueous_group(self):
-        self.aqueous_group = self.builder.CreateGroup(self.extrusion, self.builder.ShapeType["FACE"])
-        self.builder.AddObject(self.aqueous_group, self.face_id(self.aqueous_face))
-        display_group = self.builder.addToStudy(self.aqueous_group, "aqueous_inlet")
-        self.gg.setColor(display_group, 0, 0, 255)
-        self.gg.createAndDisplayGO(display_group)
+        self.aqueous_group = self.builder.CreateGroup(
+            self.extrusion, self.builder.ShapeType["FACE"]
+        )
+        self.builder.AddObject(
+            self.aqueous_group, self.face_id(self.aqueous_face)
+        )
+        self.builder.addToStudy(self.aqueous_group, "aqueous_inlet")
 
     def create_organic_group(self):
-        self.organic_group = self.builder.CreateGroup(self.extrusion, self.builder.ShapeType["FACE"])
-        self.builder.AddObject(self.organic_group, self.face_id(self.organic_face))
-        display_group = self.builder.addToStudy(self.organic_group, "organic_inlet")
-        self.gg.setColor(display_group, 255, 255, 0)
-        self.gg.createAndDisplayGO(display_group)
+        self.organic_group = self.builder.CreateGroup(
+            self.extrusion, self.builder.ShapeType["FACE"]
+        )
+        self.builder.AddObject(
+            self.organic_group, self.face_id(self.organic_face)
+        )
+        self.builder.addToStudy(self.organic_group, "organic_inlet")
 
     def create_outlet_group(self):
-        self.outlet_group = self.builder.CreateGroup(self.extrusion, self.builder.ShapeType["FACE"])
-        self.builder.AddObject(self.outlet_group, self.face_id(self.outlet_face))
-        display_group = self.builder.addToStudy(self.outlet_group, "outlet")
-        self.gg.setColor(display_group, 0, 0, 0)
-        self.gg.createAndDisplayGO(display_group)
+        self.outlet_group = self.builder.CreateGroup(
+            self.extrusion, self.builder.ShapeType["FACE"]
+        )
+        self.builder.AddObject(
+            self.outlet_group, self.face_id(self.outlet_face)
+        )
+        self.builder.addToStudy(self.outlet_group, "outlet")
 
     def create_groups(self):
         self.create_wall_group()

@@ -18,7 +18,7 @@ class Point:
         yield self.y
 
     def __repr__(self):
-        return f'({self.x}, {self.y})'
+        return f"({self.x}, {self.y})"
 
 
 def point_array(point: Point) -> array:
@@ -208,21 +208,19 @@ class Channel:
     def top_wall(self):
         return Line(self.walls[0].end, self.walls[1].end)
 
-
-    
     def __iter__(self):
         yield from self.walls
         yield self.top_wall
         yield self.bottom_wall
 
-    
-    
 
 class ChannelLayer:
     node_layers: Tuple[Layer, ...]
     channels: Tuple[Channel, ...]
 
-    def __init__(self, node_layers: Tuple[Layer, ...], channels: Tuple[Channel, ...]):
+    def __init__(
+        self, node_layers: Tuple[Layer, ...], channels: Tuple[Channel, ...]
+    ):
         self.node_layers = node_layers
         self.channels = channels
 

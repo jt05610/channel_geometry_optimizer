@@ -1,0 +1,30 @@
+import sys
+import os
+
+import killSalomeWithPort
+
+sys.path.insert(
+    0,
+    $path_name,
+)
+
+from salome_interface import SalomeInterface
+from geometry import create_lattice
+
+interface = SalomeInterface()
+
+lattice = create_lattice(
+    $lattice_structure,
+    $channel_spacing,
+    $channel_width
+)
+
+interface.create_geometry(
+    lattice,
+    $channel_height,
+)
+interface.mesh_pipeline(
+    $save_name
+)
+
+killSalomeWithPort.killMyPort(os.getenv("NSPORT"))
