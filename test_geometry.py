@@ -152,8 +152,14 @@ class DataStructuresTestCase(unittest.TestCase):
             self.interface.add_line(line)
         self.interface.show()
 
+    def test_extrude_lattice(self):
+
     def test_point_set(self):
         lattice = geometry.create_lattice(
             (2, 1, 2, 3, 2, 1, 2, 3, 2, 1, 1), 5, 0.5
         )
         print(geometry.lattice_point_set(lattice))
+
+
+if __name__ == '__main__':
+    unittest.main()

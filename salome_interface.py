@@ -6,7 +6,7 @@ from geometry import (
     DesignInterface,
     Line,
     Point,
-    Channel,
+    ExtrudedChannel,
     Lattice,
     lattice_channel_gen,
 )
@@ -16,11 +16,7 @@ class SalomeVertex:
     obj: object
     point: Point
 
-    def __init__(
-            self,
-            obj: object,
-            point: Point
-    ):
+    def __init__(self, obj: object, point: Point):
         self.obj = obj
         self.point = point
 
@@ -29,24 +25,16 @@ class SalomeLine:
     obj: object
     line: Line
 
-    def __init__(
-            self,
-            obj: object,
-            line: Line
-    ):
+    def __init__(self, obj: object, line: Line):
         self.obj = obj
         self.line = line
 
 
-class SalomeFace:
+class SalomeChannel:
     obj: object
-    channel: Channel
+    channel: ExtrudedChannel
 
-    def __init__(
-            self,
-            obj: object,
-            channel: Channel
-    ):
+    def __init__(self, obj: object, channel: Channel):
         self.obj = obj
         self.channel = channel
 
@@ -55,11 +43,7 @@ class SalomeFusedFaces:
     obj: object
     lattice: Lattice
 
-    def __init__(
-            self,
-            obj: object,
-            lattice: Lattice
-    ):
+    def __init__(self, obj: object, lattice: Lattice):
         self.obj = obj
         self.lattice = lattice
 
@@ -75,7 +59,7 @@ class SalomeInterface(DesignInterface):
         self.faces: List[SalomeFace] = []
 
     def add_point(self, point: Point):
-        vertex = self.builder.MakeVertex(point.x, point.y, 0)
+        vertex = self.builder.MakeVertex(point.x, point.y, point.z)
         self.vertices.append(SalomeVertex(vertex, point))
         return vertex
 
@@ -85,7 +69,7 @@ class SalomeInterface(DesignInterface):
         self.lines.append(SalomeLine(salome_line, line))
         return salome_line
 
-    def add_face(self, channel: Channel):
+    def add_channel_faces(self, channel: ExtrudedChannel):
         lines = list(map(self.line_lookup, channel))
         print(lines)
         print(len(lines))
@@ -101,8 +85,10 @@ class SalomeInterface(DesignInterface):
         self.builder.addToStudy(fuse, f"fuse")
 
     def extrude(self, height: float):
-        self.extrusion = self.builder.MakePrismDXDYDZ(self.fuse.obj, 0, 0, height)
-        self.builder.addToStudy(self.extrusion, 'extrusion')
+        self.extrusion = self.builder.MakePrismDXDYDZ(
+            self.fuse.obj, 0, 0, height
+        )
+        self.builder.addToStudy(self.extrusion, "extrusion")
 
     def vertex_lookup(self, point: Point) -> object:
         return next(filter(lambda x: x.point == point, self.vertices)).obj
