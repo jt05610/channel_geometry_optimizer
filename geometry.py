@@ -485,9 +485,12 @@ def create_lattice(
             channels[i] = flatten_channel_layer(channels[i], "end")
             channels[i + 1] = flatten_channel_layer(channels[i + 1], "start")
         return tuple(channels)
+
     channel_layers = cut_channel_gen()
     if layer_points[0:2] == (3, 1):
-        first_layer = triple_inlet(channel_spacing=point_spacing, channel_width=channel_width)
+        first_layer = triple_inlet(
+            channel_spacing=point_spacing, channel_width=channel_width
+        )
         channel_layers = (first_layer,) + channel_layers[1:]
 
     return Lattice(channel_layers)
@@ -514,8 +517,9 @@ def triple_inlet(channel_spacing: float, channel_width: float):
     def channel(line: Line):
         return create_channel(line, channel_width)
 
-    return ChannelLayer(node_layers=layers,
-                        channels=tuple(map(channel, connected_layer_gen())))
+    return ChannelLayer(
+        node_layers=layers, channels=tuple(map(channel, connected_layer_gen()))
+    )
 
 
 def random_layer_sequence(n_layers, max_width, max_layer_difference):

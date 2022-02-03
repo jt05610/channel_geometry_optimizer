@@ -55,7 +55,7 @@ class SalomeFusedFaces:
 class SalomeInterface(DesignInterface):
     fuse: SalomeFusedFaces
     lattice: Lattice
-    fillet: object
+    filleted_fuse: object
     extrusion_height: float
     wall_group: object
     aqueous_group: object
@@ -195,8 +195,6 @@ class SalomeInterface(DesignInterface):
         points += tuple(map(self.vertex_func, channel.bottom_wall))
         return self.builder.GetFaceByPoints(self.extrusion, *points)
 
-
-
     @property
     def outlet_face(self):
         channel = self.lattice.channel_layers[-1].channels[0]
@@ -218,16 +216,47 @@ class SalomeInterface(DesignInterface):
             self.fuse.obj, self.builder.ShapeType["VERTEX"]
         )
         vertices_to_fillet = []
-        aqueous_vertices = tuple(map(self.get_vertex_near_point, map(self.make_vertex, self.lattice.channel_layers[0].channels[0].bottom_wall)))
-        organic_vertices = tuple(map(self.get_vertex_near_point, map(self.make_vertex, self.lattice.channel_layers[0].channels[1].bottom_wall)))
-        outlet_vertices = tuple(map(self.get_vertex_near_point, map(self.make_vertex, self.lattice.channel_layers[-1].channels[0].top_wall)))
+        aqueous_vertices = tuple(
+            map(
+                self.get_vertex_near_point,
+                map(
+                    self.make_vertex,
+                    self.lattice.channel_layers[0].channels[0].bottom_wall,
+                ),
+            )
+        )
+        organic_vertices = tuple(
+            map(
+                self.get_vertex_near_point,
+                map(
+                    self.make_vertex,
+                    self.lattice.channel_layers[0].channels[1].bottom_wall,
+                ),
+            )
+        )
+        outlet_vertices = tuple(
+            map(
+                self.get_vertex_near_point,
+                map(
+                    self.make_vertex,
+                    self.lattice.channel_layers[-1].channels[0].top_wall,
+                ),
+            )
+        )
         for vertex in sub_vertices:
             vertices_to_fillet.append(self.vertex_id(vertex))
-        for vertex_pair in (aqueous_vertices, organic_vertices, outlet_vertices):
+        for vertex_pair in (
+            aqueous_vertices,
+            organic_vertices,
+            outlet_vertices,
+        ):
             for vertex in vertex_pair:
                 vertices_to_fillet.remove(self.vertex_id(vertex))
-        self.fillet = self.builder.MakeFillet2D(self.fuse.obj, 0.1, vertices_to_fillet)
-        self.builder.addToStudy(self.fillet, 'fillet')
+        self.filleted_fuse = self.builder.MakeFillet2D(
+            self.fuse.obj, 0.1, vertices_to_fillet
+        )
+        self.builder.addToStudy(self.fillet, "fillet")
+
     def create_wall_group(self):
         self.wall_group = self.builder.CreateGroup(
             self.extrusion, self.builder.ShapeType["FACE"]

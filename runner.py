@@ -12,9 +12,7 @@ def create_mesh(
     channel_width,
     channel_height,
 ):
-    mesh_structure_string = "-".join(
-        str(layer) for layer in lattice_structure
-    )
+    mesh_structure_string = "-".join(str(layer) for layer in lattice_structure)
 
     save_name = os.path.join(
         config.MESH_PATH,
