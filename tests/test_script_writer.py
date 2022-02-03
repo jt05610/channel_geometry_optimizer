@@ -32,14 +32,14 @@ class ScriptWriterTestCase(unittest.TestCase):
         self.assertEqual(len(start_template), len(template))
         self.assertNotEqual(start_template, template)
 
+    def test_delete_script_if_doesnt_exist(self):
+        script_writer.delete_script(self.temp_dir_path)
+        script_writer.delete_script(self.temp_dir_path)
+
     def test_write_script(self):
         script_writer.write_script(
             self.template_path, self.variables, self.temp_dir_path
         )
-
-    def test_delete_script_if_doesnt_exist(self):
-        script_writer.delete_script(self.temp_dir_path)
-        script_writer.delete_script(self.temp_dir_path)
 
 
 if __name__ == "__main__":

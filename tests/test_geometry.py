@@ -157,3 +157,7 @@ class DataStructuresTestCase(unittest.TestCase):
             (2, 1, 2, 3, 2, 1, 2, 3, 2, 1, 1), 5, 0.5
         )
         print(geometry.lattice_point_set(lattice))
+
+    def test_random_layer_sequence(self):
+        sequence = geometry.random_layer_sequence(21, 3, 1)
+        print(sequence)

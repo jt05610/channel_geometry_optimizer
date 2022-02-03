@@ -55,6 +55,7 @@ class SalomeFusedFaces:
 class SalomeInterface(DesignInterface):
     fuse: SalomeFusedFaces
     lattice: Lattice
+    fillet: object
     extrusion_height: float
     wall_group: object
     aqueous_group: object
@@ -83,6 +84,7 @@ class SalomeInterface(DesignInterface):
             self.add_face(channel)
 
         self.fuse_faces(lattice)
+        self.fillet()
         self.extrude(extrusion_height)
         self.create_groups()
 
@@ -98,8 +100,8 @@ class SalomeInterface(DesignInterface):
         self.mesh_parameters.SetUseSurfaceCurvature(1)
         self.mesh_parameters.SetFuseEdges(1)
         self.mesh_parameters.SetQuadAllowed(0)
-        self.mesh_parameters.SetMaxSize(0.3)
-        self.mesh_parameters.SetMinSize(0.005)
+        self.mesh_parameters.SetMaxSize(0.2)
+        self.mesh_parameters.SetMinSize(0.1)
         self.mesh_parameters.SetCheckChartBoundary(176)
 
     def create_mesh(self):
@@ -155,10 +157,11 @@ class SalomeInterface(DesignInterface):
         fuse = self.builder.MakeFuseList(faces, True, True)
         self.fuse = SalomeFusedFaces(fuse, lattice)
         self.lattice = lattice
+        self.builder.addToStudy(fuse, "fuse")
 
     def extrude(self, height: float):
         self.extrusion = self.builder.MakePrismDXDYDZ(
-            self.fuse.obj, 0, 0, height
+            self.fillet, 0, 0, height
         )
         self.extrusion_height = height
         self.builder.addToStudy(self.extrusion, "extrusion")
@@ -192,6 +195,8 @@ class SalomeInterface(DesignInterface):
         points += tuple(map(self.vertex_func, channel.bottom_wall))
         return self.builder.GetFaceByPoints(self.extrusion, *points)
 
+
+
     @property
     def outlet_face(self):
         channel = self.lattice.channel_layers[-1].channels[0]
@@ -202,6 +207,27 @@ class SalomeInterface(DesignInterface):
     def face_id(self, face: object):
         return self.builder.GetSubShapeID(self.extrusion, face)
 
+    def vertex_id(self, face: object):
+        return self.builder.GetSubShapeID(self.fuse.obj, face)
+
+    def get_vertex_near_point(self, vertex):
+        return self.builder.GetVertexNearPoint(self.fuse.obj, vertex)
+
+    def fillet(self):
+        sub_vertices = self.builder.SubShapeAllSortedCentres(
+            self.fuse.obj, self.builder.ShapeType["VERTEX"]
+        )
+        vertices_to_fillet = []
+        aqueous_vertices = tuple(map(self.get_vertex_near_point, map(self.make_vertex, self.lattice.channel_layers[0].channels[0].bottom_wall)))
+        organic_vertices = tuple(map(self.get_vertex_near_point, map(self.make_vertex, self.lattice.channel_layers[0].channels[1].bottom_wall)))
+        outlet_vertices = tuple(map(self.get_vertex_near_point, map(self.make_vertex, self.lattice.channel_layers[-1].channels[0].top_wall)))
+        for vertex in sub_vertices:
+            vertices_to_fillet.append(self.vertex_id(vertex))
+        for vertex_pair in (aqueous_vertices, organic_vertices, outlet_vertices):
+            for vertex in vertex_pair:
+                vertices_to_fillet.remove(self.vertex_id(vertex))
+        self.fillet = self.builder.MakeFillet2D(self.fuse.obj, 0.1, vertices_to_fillet)
+        self.builder.addToStudy(self.fillet, 'fillet')
     def create_wall_group(self):
         self.wall_group = self.builder.CreateGroup(
             self.extrusion, self.builder.ShapeType["FACE"]

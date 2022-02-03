@@ -40,9 +40,7 @@ def create_mesh(
         temp_dir_path=config.TEMP_DIR_PATH,
     )
     subprocess.run(
-        [r"run_salome.bat", "-t", "tmp/script.py"],
+        ["run_salome.bat", "-t", "tmp/script.py"],
     )
     while not os.path.exists(save_name):
         sleep(1)
-
-    script_writer.delete_script(config.TEMP_DIR_PATH)

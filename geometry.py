@@ -481,7 +481,7 @@ def create_lattice(
         channels = list(joined_channel_layer_gen())
         _gen = layer_gen()
         _ = next(layer_gen())
-        for i in range(len(channels) - 2):
+        for i in range(2, len(channels) - 2):
             channels[i] = flatten_channel_layer(channels[i], "end")
             channels[i + 1] = flatten_channel_layer(channels[i + 1], "start")
         return tuple(channels)
