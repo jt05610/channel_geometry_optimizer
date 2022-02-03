@@ -3,7 +3,7 @@ import runner
 
 
 class RunnerTest(TestCase):
-    lattice_structure = (2, 1, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 3, 2, 1, 1)
+    lattice_structure = (3, 1, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 3, 2, 1, 1)
     channel_spacing = 2.5
     channel_width = 0.5
     channel_height = 0.56

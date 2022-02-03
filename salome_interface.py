@@ -182,7 +182,7 @@ class SalomeInterface(DesignInterface):
         return self.make_vertex(point, self.extrusion_height)
 
     @property
-    def aqueous_face(self):
+    def aqueous_face_1(self):
         channel = self.lattice.channel_layers[0].channels[0]
         points = tuple(map(self.make_vertex, channel.bottom_wall))
         points += tuple(map(self.vertex_func, channel.bottom_wall))
@@ -191,6 +191,13 @@ class SalomeInterface(DesignInterface):
     @property
     def organic_face(self):
         channel = self.lattice.channel_layers[0].channels[1]
+        points = tuple(map(self.make_vertex, channel.bottom_wall))
+        points += tuple(map(self.vertex_func, channel.bottom_wall))
+        return self.builder.GetFaceByPoints(self.extrusion, *points)
+
+    @property
+    def aqueous_face_2(self):
+        channel = self.lattice.channel_layers[0].channels[2]
         points = tuple(map(self.make_vertex, channel.bottom_wall))
         points += tuple(map(self.vertex_func, channel.bottom_wall))
         return self.builder.GetFaceByPoints(self.extrusion, *points)
@@ -243,13 +250,25 @@ class SalomeInterface(DesignInterface):
                 ),
             )
         )
-        for vertex in sub_vertices:
-            vertices_to_fillet.append(self.vertex_id(vertex))
-        for vertex_pair in (
+        vertices = (
             aqueous_vertices,
             organic_vertices,
             outlet_vertices,
-        ):
+        )
+        if len(self.lattice.channel_layers[0].channels) == 3:
+            vertices = vertices + (tuple(
+                map(
+                    self.get_vertex_near_point,
+                    map(
+                        self.make_vertex,
+                        self.lattice.channel_layers[0].channels[2].bottom_wall
+                    )
+                )
+            ),)
+
+        for vertex in sub_vertices:
+            vertices_to_fillet.append(self.vertex_id(vertex))
+        for vertex_pair in vertices:
             for vertex in vertex_pair:
                 vertices_to_fillet.remove(self.vertex_id(vertex))
         self.filleted_fuse = self.builder.MakeFillet2D(
@@ -267,7 +286,10 @@ class SalomeInterface(DesignInterface):
         for face in sub_faces:
             self.builder.AddObject(self.wall_group, self.face_id(face))
 
-        for face in (self.aqueous_face, self.organic_face, self.outlet_face):
+        faces = (self.aqueous_face_1, self.organic_face, self.outlet_face)
+        if len(self.lattice.channel_layers[0].channels) == 3:
+            faces += (self.aqueous_face_2,)
+        for face in faces:
             self.builder.RemoveObject(self.wall_group, self.face_id(face))
 
         self.builder.addToStudy(self.wall_group, "walls")
@@ -277,9 +299,9 @@ class SalomeInterface(DesignInterface):
             self.extrusion, self.builder.ShapeType["FACE"]
         )
         self.builder.AddObject(
-            self.aqueous_group, self.face_id(self.aqueous_face)
+            self.aqueous_group, self.face_id(self.aqueous_face_1)
         )
-        self.builder.addToStudy(self.aqueous_group, "aqueous_inlet")
+        self.builder.addToStudy(self.aqueous_group, "aqueous_inlet_1")
 
     def create_organic_group(self):
         self.organic_group = self.builder.CreateGroup(
@@ -289,6 +311,15 @@ class SalomeInterface(DesignInterface):
             self.organic_group, self.face_id(self.organic_face)
         )
         self.builder.addToStudy(self.organic_group, "organic_inlet")
+
+    def create_aqueous_2_group(self):
+        aqueous_group = self.builder.CreateGroup(
+            self.extrusion, self.builder.ShapeType["FACE"]
+        )
+        self.builder.AddObject(
+            self.organic_group, self.face_id(self.aqueous_face_2)
+        )
+        self.builder.addToStudy(aqueous_group, "aqueous_inlet_2")
 
     def create_outlet_group(self):
         self.outlet_group = self.builder.CreateGroup(
@@ -304,3 +335,5 @@ class SalomeInterface(DesignInterface):
         self.create_aqueous_group()
         self.create_organic_group()
         self.create_outlet_group()
+        if len(self.lattice.channel_layers[0].channels) == 3:
+            self.create_aqueous_2_group()
