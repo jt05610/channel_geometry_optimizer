@@ -41,6 +41,15 @@ class Line:
         return other.start == self.start and other.end == self.end
 
 
+class NamedLine:
+    line: Line
+    name: str
+
+    def __init__(self, line: Line, name: str):
+        self.line = line
+        self.name = name
+
+
 def xs(line):
     return tuple(map(lambda l: l.x, line))
 
@@ -123,18 +132,6 @@ class ConnectedLayers:
     def __init__(self, layers: Tuple[Layer, ...], lines: Tuple[Line, ...]):
         self.layers = layers
         self.lines = lines
-
-
-class DesignInterface(ABC):
-    @abstractmethod
-    def add_point(self, point: Point):
-        raise NotImplementedError
-
-    def add_line(
-        self,
-        line: Line,
-    ):
-        raise NotImplementedError
 
 
 def create_layer(n_points, y_level, spacing) -> Layer:
