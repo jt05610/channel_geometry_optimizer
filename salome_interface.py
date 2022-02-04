@@ -1,12 +1,14 @@
-from typing import List
+from typing import List, Tuple, Optional
 
 import SMESH
 from salome.geom import geomBuilder
 from salome.smesh import smeshBuilder
 
+from design_interface import DesignInterface
+
 from geometry import (
-    DesignInterface,
     Line,
+    NamedLine,
     Point,
     Channel,
     Lattice,
@@ -52,16 +54,30 @@ class SalomeFusedFaces:
         self.lattice = lattice
 
 
+class SalomeNamedGroup:
+    obj: object
+    named_line: Optional[NamedLine]
+    name: str
+
+    def __init__(self, obj: object, name: str, named_line: NamedLine = None):
+        self.obj = obj
+        self.named_line = named_line
+        self.name = name
+
+
 class SalomeInterface(DesignInterface):
     fuse: SalomeFusedFaces
     lattice: Lattice
     filleted_fuse: object
     extrusion_height: float
-    wall_group: object
-    aqueous_group: object
+    groups: Tuple[SalomeNamedGroup]
+    extrusion: object
+
+    # to deprecate
     organic_group: object
     outlet_group: object
-    extrusion: object
+    wall_group: object
+    aqueous_group: object
 
     def __init__(self):
         self.builder = geomBuilder.New()
@@ -73,7 +89,6 @@ class SalomeInterface(DesignInterface):
         self.mesh = None
 
     def create_geometry(self, lattice: Lattice, extrusion_height: float):
-
         for point in lattice_point_set(lattice):
             self.add_point(point)
 
@@ -86,7 +101,7 @@ class SalomeInterface(DesignInterface):
         self.fuse_faces(lattice)
         self.fillet()
         self.extrude(extrusion_height)
-        self.create_groups()
+        self.create_groups_old()
 
     def build_hypothesis(self):
         self.mesh_parameters = self.mesh_builder.CreateHypothesis(
@@ -104,35 +119,35 @@ class SalomeInterface(DesignInterface):
         self.mesh_parameters.SetMinSize(0.1)
         self.mesh_parameters.SetCheckChartBoundary(176)
 
-    def create_mesh(self):
+    @staticmethod
+    def mesh_group_on_geom(mesh: smeshBuilder.Mesh, group: SalomeNamedGroup):
+        return mesh.GroupOnGeom(group.obj, group.name)
+
+    def build_mesh(self):
         self.mesh = self.mesh_builder.Mesh(self.extrusion)
         netgen_1d_2d_3d = self.mesh_builder.CreateHypothesis(
             "NETGEN_2D3D", "NETGENEngine"
         )
         self.mesh.AddHypothesis(self.mesh_parameters)
         self.mesh.AddHypothesis(netgen_1d_2d_3d)
-        walls = self.mesh.GroupOnGeom(self.wall_group, "walls", SMESH.FACE)
-        organic = self.mesh.GroupOnGeom(
-            self.organic_group, "organic_inlet", SMESH.FACE
-        )
-        aqueous = self.mesh.GroupOnGeom(
-            self.aqueous_group, "aqueous_inlet", SMESH.FACE
-        )
-        outlet = self.mesh.GroupOnGeom(self.outlet_group, "outlet", SMESH.FACE)
 
+        def mesh_group_func(_group: SalomeNamedGroup):
+            return self.mesh_group_on_geom(self.mesh, _group)
+
+        mesh_groups = tuple(map(mesh_group_func, self.groups))
         self.mesh.Compute()
-        self.mesh_builder.SetName(walls, "walls")
-        self.mesh_builder.SetName(organic, "organic_inlet")
-        self.mesh_builder.SetName(aqueous, "aqueous_inlet")
-        self.mesh_builder.SetName(outlet, "outlet")
-        self.mesh_builder.SetName(self.mesh.GetMesh(), "outlet")
+
+        for mesh_group, group in zip(mesh_groups, self.groups):
+            self.mesh_builder.SetName(mesh_group, group.name)
+
+        self.mesh_builder.SetName(self.mesh.GetMesh(), "mesh")
 
     def export_mesh(self, filename):
         self.mesh.ExportUNV(filename)
 
-    def mesh_pipeline(self, save_name: str):
+    def create_mesh(self, save_name: str):
         self.build_hypothesis()
-        self.create_mesh()
+        self.build_mesh_old()
         self.export_mesh(save_name)
 
     def add_point(self, point: Point):
@@ -181,6 +196,107 @@ class SalomeInterface(DesignInterface):
     def vertex_func(self, point: Point):
         return self.make_vertex(point, self.extrusion_height)
 
+    def get_face(self, face: NamedLine):
+        points = tuple(map(self.make_vertex, face.line))
+        points += tuple(map(self.vertex_func, face.line))
+        return self.builder.GetFaceByPoints(self.extrusion, *points)
+
+    def sub_shape_id(self, shape: object, sub_shape: object):
+        return self.builder.GetSubShapeID(shape, sub_shape)
+
+    def face_id(self, face: object):
+        return self.sub_shape_id(self.extrusion, face)
+
+    def vertex_id(self, vertex: object):
+        return self.sub_shape_id(self.fuse.obj, vertex)
+
+    def get_vertex_near_point(self, point):
+        return self.builder.GetVertexNearPoint(self.fuse.obj, point)
+
+    def exclude_vertices(self):
+        vertices = map(self.make_vertex, self.exclude_points(self.lattice))
+        yield from map(self.get_vertex_near_point, vertices)
+
+    def exclude_vertex_ids(self):
+        yield from map(self.vertex_id, self.exclude_vertices())
+
+    def make_fillet(self):
+        sub_vertices = map(
+            self.vertex_id,
+            self.builder.SubShapeAllSortedCentres(
+                self.fuse.obj, self.builder.ShapeType["VERTEX"]
+            ),
+        )
+        vertices_to_fillet = list(
+            filter(
+                lambda x: x not in self.exclude_vertex_ids(),
+                sub_vertices,
+            )
+        )
+
+        self.filleted_fuse = self.builder.MakeFillet2D(
+            self.fuse.obj, 0.1, vertices_to_fillet
+        )
+        self.builder.addToStudy(self.fillet, "fillet")
+
+    def make_wall_group(self, face_groups: Tuple[SalomeNamedGroup]):
+        group = self.builder.CreateGroup(
+            self.extrusion, self.builder.ShapeType["Face"]
+        )
+        sub_faces = self.builder.SubShapeAllSortedCentres(
+            self.extrusion, self.builder.ShapeType["FACE"]
+        )
+        sub_face_id_gen = map(self.face_id, sub_faces)
+        exclude_faces = map(
+            self.face_id, (self.get_face(g.named_line) for g in face_groups)
+        )
+        for face_id in filter(
+            lambda x: x not in exclude_faces, sub_face_id_gen
+        ):
+            self.builder.AddObject(group, face_id)
+        self.builder.addToStudy(group, "walls")
+        return SalomeNamedGroup(group, name="walls")
+
+    def create_group(self, named_line: NamedLine):
+        group = self.builder.CreateGroup(
+            self.extrusion, self.builder.ShapeType["FACE"]
+        )
+        self.builder.AddObject(group, self.face_id(self.get_face(named_line)))
+        self.builder.addToStudy(group, named_line.name)
+        return SalomeNamedGroup(
+            group, named_line=named_line, name=named_line.name
+        )
+
+    def create_groups(self):
+        groups = tuple(map(self.create_group, self.named_faces(self.lattice)))
+        groups += (self.make_wall_group(groups),)
+        self.groups = groups
+
+    # Functions to deprecate
+
+    def build_mesh_old(self):
+        self.mesh = self.mesh_builder.Mesh(self.extrusion)
+        netgen_1d_2d_3d = self.mesh_builder.CreateHypothesis(
+            "NETGEN_2D3D", "NETGENEngine"
+        )
+        self.mesh.AddHypothesis(self.mesh_parameters)
+        self.mesh.AddHypothesis(netgen_1d_2d_3d)
+        walls = self.mesh.GroupOnGeom(self.wall_group, "walls", SMESH.FACE)
+        organic = self.mesh.GroupOnGeom(
+            self.organic_group, "organic_inlet", SMESH.FACE
+        )
+        aqueous = self.mesh.GroupOnGeom(
+            self.aqueous_group, "aqueous_inlet", SMESH.FACE
+        )
+        outlet = self.mesh.GroupOnGeom(self.outlet_group, "outlet", SMESH.FACE)
+
+        self.mesh.Compute()
+        self.mesh_builder.SetName(walls, "walls")
+        self.mesh_builder.SetName(organic, "organic_inlet")
+        self.mesh_builder.SetName(aqueous, "aqueous_inlet")
+        self.mesh_builder.SetName(outlet, "outlet")
+        self.mesh_builder.SetName(self.mesh.GetMesh(), "outlet")
+
     @property
     def aqueous_face_1(self):
         channel = self.lattice.channel_layers[0].channels[0]
@@ -209,20 +325,12 @@ class SalomeInterface(DesignInterface):
         points += tuple(map(self.vertex_func, channel.top_wall))
         return self.builder.GetFaceByPoints(self.extrusion, *points)
 
-    def face_id(self, face: object):
-        return self.builder.GetSubShapeID(self.extrusion, face)
-
-    def vertex_id(self, face: object):
-        return self.builder.GetSubShapeID(self.fuse.obj, face)
-
-    def get_vertex_near_point(self, vertex):
-        return self.builder.GetVertexNearPoint(self.fuse.obj, vertex)
-
     def fillet(self):
         sub_vertices = self.builder.SubShapeAllSortedCentres(
             self.fuse.obj, self.builder.ShapeType["VERTEX"]
         )
         vertices_to_fillet = []
+
         aqueous_vertices = tuple(
             map(
                 self.get_vertex_near_point,
@@ -256,15 +364,19 @@ class SalomeInterface(DesignInterface):
             outlet_vertices,
         )
         if len(self.lattice.channel_layers[0].channels) == 3:
-            vertices = vertices + (tuple(
-                map(
-                    self.get_vertex_near_point,
+            vertices = vertices + (
+                tuple(
                     map(
-                        self.make_vertex,
-                        self.lattice.channel_layers[0].channels[2].bottom_wall
+                        self.get_vertex_near_point,
+                        map(
+                            self.make_vertex,
+                            self.lattice.channel_layers[0]
+                            .channels[2]
+                            .bottom_wall,
+                        ),
                     )
-                )
-            ),)
+                ),
+            )
 
         for vertex in sub_vertices:
             vertices_to_fillet.append(self.vertex_id(vertex))
@@ -293,6 +405,14 @@ class SalomeInterface(DesignInterface):
             self.builder.RemoveObject(self.wall_group, self.face_id(face))
 
         self.builder.addToStudy(self.wall_group, "walls")
+
+    def create_groups_old(self):
+        self.create_wall_group()
+        self.create_aqueous_group()
+        self.create_organic_group()
+        self.create_outlet_group()
+        if len(self.lattice.channel_layers[0].channels) == 3:
+            self.create_aqueous_2_group()
 
     def create_aqueous_group(self):
         self.aqueous_group = self.builder.CreateGroup(
@@ -329,11 +449,3 @@ class SalomeInterface(DesignInterface):
             self.outlet_group, self.face_id(self.outlet_face)
         )
         self.builder.addToStudy(self.outlet_group, "outlet")
-
-    def create_groups(self):
-        self.create_wall_group()
-        self.create_aqueous_group()
-        self.create_organic_group()
-        self.create_outlet_group()
-        if len(self.lattice.channel_layers[0].channels) == 3:
-            self.create_aqueous_2_group()
