@@ -1,0 +1,14 @@
+$walls_alpha
+{
+    type            zeroGradient;
+}
+$inlet_alpha
+{
+    type            inletOutlet;
+    inletValue      uniform $inlet_fluid;
+    value           uniform $inlet_fluid;
+}
+$outlet_alpha
+{
+    type            zeroGradient;
+}

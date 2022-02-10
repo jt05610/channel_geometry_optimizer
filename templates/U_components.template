@@ -1,0 +1,13 @@
+$walls_U
+{
+    type            noSlip;
+}
+$inlet_U
+{
+    type            fixedValue;
+    value           $inlet_value;
+}
+$outlet_U
+{
+    type            zeroGradient;
+}

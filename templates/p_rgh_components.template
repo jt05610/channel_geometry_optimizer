@@ -1,0 +1,13 @@
+$walls_p_rgh
+{
+    type            zeroGradient;
+}
+$inlet_p_rgh
+{
+    type            zeroGradient;
+}
+$outlet_p_rgh
+{
+    type            fixedValue;
+    value           uniform 0;
+}
