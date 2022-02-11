@@ -247,12 +247,8 @@ class SalomeInterface(DesignInterface):
             self.extrusion, self.builder.ShapeType["FACE"]
         )
         sub_face_id_gen = map(self.face_id, sub_faces)
-        exclude_faces = map(
-            self.face_id, (self.get_face(g.named_line) for g in face_groups)
-        )
-        for face_id in filter(
-            lambda x: x not in exclude_faces, sub_face_id_gen
-        ):
+        exclude_faces = map(self.face_id, (self.get_face(g.named_line) for g in face_groups))
+        for face_id in filter(lambda x: x not in exclude_faces, sub_face_id_gen):
             self.builder.AddObject(group, face_id)
         self.builder.addToStudy(group, "walls")
         return SalomeNamedGroup(group, name="walls")
@@ -263,9 +259,7 @@ class SalomeInterface(DesignInterface):
         )
         self.builder.AddObject(group, self.face_id(self.get_face(named_line)))
         self.builder.addToStudy(group, named_line.name)
-        return SalomeNamedGroup(
-            group, named_line=named_line, name=named_line.name
-        )
+        return SalomeNamedGroup(group, named_line=named_line, name=named_line.name)
 
     def create_groups(self):
         groups = tuple(map(self.create_group, self.named_faces(self.lattice)))
